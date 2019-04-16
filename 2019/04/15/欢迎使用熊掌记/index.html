@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  
+
+  
+  <title>Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="#关于TapGesture、UIResponder 链和 target-action 事件的相互影响的机理和应用https://github.com/hite/IOSEventTest 这是一个供探索、验证、对比测试而精心设计的demo。用来研究 UIControl，普通的 View 在 使用 target-action, addTapGestureRecognizer 方式时，不同情况下如何相互">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hexo">
+<meta property="og:url" content="http://yoursite.com/2019/04/15/欢迎使用熊掌记/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="#关于TapGesture、UIResponder 链和 target-action 事件的相互影响的机理和应用https://github.com/hite/IOSEventTest 这是一个供探索、验证、对比测试而精心设计的demo。用来研究 UIControl，普通的 View 在 使用 target-action, addTapGestureRecognizer 方式时，不同情况下如何相互">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://note.youdao.com/yws/public/resource/da1fb057778fbcf4a05cb9c994b13846/xmlnote/WEBRESOURCE2e305427f7f7b8ec064721da3377d0dc/476">
+<meta property="og:updated_time" content="2019-04-15T11:48:38.505Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Hexo">
+<meta name="twitter:description" content="#关于TapGesture、UIResponder 链和 target-action 事件的相互影响的机理和应用https://github.com/hite/IOSEventTest 这是一个供探索、验证、对比测试而精心设计的demo。用来研究 UIControl，普通的 View 在 使用 target-action, addTapGestureRecognizer 方式时，不同情况下如何相互">
+<meta name="twitter:image" content="https://note.youdao.com/yws/public/resource/da1fb057778fbcf4a05cb9c994b13846/xmlnote/WEBRESOURCE2e305427f7f7b8ec064721da3377d0dc/476">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+</html>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-欢迎使用熊掌记" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2019/04/15/欢迎使用熊掌记/" class="article-date">
+  <time datetime="2019-04-15T08:27:49.049Z" itemprop="datePublished">2019-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>#关于TapGesture、UIResponder 链和 target-action 事件的相互影响的机理和应用<br><a href="https://github.com/hite/IOSEventTest" target="_blank" rel="noopener">https://github.com/hite/IOSEventTest</a></p>
+<p><strong>这是一个供探索、验证、对比测试而精心设计的demo。</strong><br>用来研究 UIControl，普通的 View 在 使用 target-action, addTapGestureRecognizer 方式时，不同情况下如何相互作用。<br>试图解答以下问题；</p>
+<ol>
+<li>第一响应者如何确认？（包括 <code>alpha，hidden，clipToBound</code> 属性的影响，都不是本次试验的重点）</li>
+<li>target-action 和 tapGesture 混用时，如何表现，加入变量 <code>cancelsTouchesInView</code> 时，是否有不同？</li>
+<li>target-action 或者 tapGesture 是否各自都有多个？</li>
+<li>包括相同类型 event state 和 gesture Type 是否有多个？</li>
+<li>包括不同类型 event state 和 gesture Type 是否有多个？</li>
+<li>相同和不同类型 target-action 或者 tapGesture 的添加顺序和执行顺序是否有关系？</li>
+</ol>
+<figure class="highlight objectivec"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Model:</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">User</span> : <span class="title">NSObject</span></span></span><br><span class="line"><span class="keyword">@property</span> <span class="built_in">UInt64</span> uid;</span><br><span class="line"><span class="keyword">@property</span> <span class="built_in">NSString</span> *name;</span><br><span class="line"><span class="keyword">@property</span> <span class="built_in">NSDate</span> *created;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">User</span></span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">// Convert json to model:</span></span><br><span class="line">User *user = [User yy_modelWithJSON:json];</span><br><span class="line"></span><br><span class="line"><span class="comment">// Convert model to json:</span></span><br><span class="line"><span class="built_in">NSDictionary</span> *json = [user yy_modelToJSONObject];</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">Attributes</span></span></span><br><span class="line">+ (<span class="built_in">NSDictionary</span> *)modelContainerPropertyGenericClass &#123;</span><br><span class="line"><span class="comment">// value should be Class or Class name.</span></span><br><span class="line">    <span class="keyword">return</span> @&#123;<span class="string">@"shadows"</span> : [Shadow <span class="keyword">class</span>],</span><br><span class="line">    <span class="string">@"borders"</span> : Border.class,</span><br><span class="line">    <span class="string">@"attachments"</span> : <span class="string">@"Attachment"</span> &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">gantt</span><br><span class="line">dateFormat YYYY-MM-DD</span><br><span class="line">title 大标题</span><br><span class="line">section 横向计划1</span><br><span class="line">计划详细名称: 日期(如:2018-07-21), 时长(如:4d)</span><br><span class="line">section 横向计划2</span><br><span class="line">吉他: 日期(2018-07-23), 时长(10d)</span><br></pre></td></tr></table></figure>
+<h3 id="设计可测试变量"><a href="#设计可测试变量" class="headerlink" title="设计可测试变量"></a>设计可测试变量</h3><ol>
+<li>touch 事件是否冒泡（bubble up）</li>
+<li>是否有是普通 UIResponder 还是 UIControl</li>
+<li>是否添加了 TapGesture 事件。<br>这些大测试变量是通过选不同测试入口的方式来进行的。同时，每一个大测试变量里还有一些小测试变量，写在代码内部，个别需要去掉注释或者调整代码顺序来自行验证。如,</li>
+<li>多个相同元素</li>
+<li>多个不同元素</li>
+<li>元素之前的顺序</li>
+<li>cancelsTouchesInView 变量(不考虑，delaysTouchesBegan，默认为 NO;delaysTouchesEnded，默认为 YES)</li>
+</ol>
+<p><em>如果没有条件运行源码自己观察，下面是我自己的观察和总结，可能有谬误，欢迎指正</em><br>——-TLTR;——–</p>
+<p>#####1. HitTestTouchViewController, 测试普通的 UILabel 元素在是否事件冒泡到父元素的表现<br>场景1：只有 touch 事件，没有添加 tap 手势，不 bubble 时。</p>
+<ol>
+<li>元素通过 hittest 测试，找到第一响应者后，事件不会继续向下传递。因为第一响应获取之后没有传递</li>
+<li>可以正确 touchesEnded；</li>
+</ol>
+<p>场景2：只有 touch 事件，没有添加 tap 手势，容许 bubble 时。</p>
+<ol>
+<li>元素通过 hittest 测试，找到第一响应者后，事件还会继续向上传递事件，按照从子到父的过程，传播事件</li>
+<li>可以正确 touchesEnded；</li>
+</ol>
+<p><strong>HitTestTouchGestureController，测试普通的 UILabel 元素在响应 touch 事件的同时，还被添加的 tapGesture 的表现</strong></p>
+<p>情况1：普通的 UIResponder 元素， 所有元素都有 touch 事件也有 gesture, touch 事件不 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后，先执行 touchesBegan ，然后调用 gesture，然后根据 cancelsTouchesInView 的值，决定是 touchCancelled 还是 touchesEnded。</li>
+<li>无论 cancel 或者 end，此时事件都不会向父元素传播。</li>
+</ol>
+<p>情况2：普通的 UIResponder 元素， 所有元素都有 touch 事件也有 gesture, touch 事件容许 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后，先执行 touchesBegan，然后调用 gesture</li>
+<li>cancelsTouchesInView = NO， 执行 touchesEnded。同时，执行父类的 touchesBegan 和 touchesEnded, 但是不会执行父类的 gesture</li>
+<li>cancelsTouchesInView = YES，默认值。执行 touchCancelled。同时，执行父类的 touchesBegan 和 touchesCancelled, 但是不会执行父元素的 gesture<br>结论：容许 bubble 的情况下都可以传播到父元素（这是显而易见的，也是这个实验设计的缺陷，在 touchesEnded 里去调用 super 的 touchesEnded 是不是真的符合实际情况？），cancelsTouchesInView 只影响 touch 结束的事件。<br><em>但父元素的 TapGesture 不会响应</em> </li>
+</ol>
+<p><strong>HitTestButtonViewController，测试 UIButton 有 addTarget，无 gesture 手势时，是否 bubble up 对 target-action 的影响</strong></p>
+<p><em>多个不同元素、多个相同元素、元素的顺序，元素属性修改是否有影响</em><br>情况1：普通的 UIControl 元素， 所有元素都有 touch 事件，有 action 回调，没有 gesture, touch 事件不 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后，先执行 touchesBegan，再执行 touchesEnded。但是不会执行 action 回调（why？）</li>
+<li>猜测原因：super 的 <code>touchesEnded:withEvent:</code> 会调用触发 <code>UIControlEventTouchUpInside</code>，因为我们没有调用 super 所以没有触发。<br>有调用栈为参考，<br><img src="https://note.youdao.com/yws/public/resource/da1fb057778fbcf4a05cb9c994b13846/xmlnote/WEBRESOURCE2e305427f7f7b8ec064721da3377d0dc/476" alt="调用栈">，<br>可见，触发 action-target 都是由 UIControl 父类实现的。</li>
+</ol>
+<p>情况2：普通的 UIControl 元素， 所有元素都有 touch 事件，有 action 回调，没有 gesture, touch 事件容许 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后，先执行 action 回调（allTouchEvent，touchDown 等）、touchesBegan，再执行 action 回调（touchUpInside之类）、touchesEndeded</li>
+<li>touch 事件不会传播到父元素，即使是没有 action 回调， button 上的事件也不会向父元素传播。</li>
+</ol>
+<p><strong>HitTestButtonGestureController，测试 UIButton 有 addTarget，同时也有 gesture 手势时，是否 bubble up 对 target-action 和 gesture 的影响</strong></p>
+<p>情况1：普通的 UIControl 元素， 所有元素都有 touch 事件，有 action 回调，而且有 gesture, touch 事件不 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后，先执行 touchesBegan，接下来执行最后一个 gesture 手势，</li>
+<li>cancelsTouchesInView=NO 时，再执行 touchesEnded，</li>
+<li>cancelsTouchesInView=YES 时，再执行 touchesCancelled</li>
+<li>不会执行 action 回调，因为没有调用 <code>touchesEnded</code> super 方法。 <blockquote>
+<p>If a gesture recognizer recognizes its gesture, it unbinds the remaining touches of that gesture from their view (so the window won’t deliver them). The window cancels the previously delivered touches with a (touchesCancelled(_:with:)) message. If a gesture recognizer doesn’t recognize its gesture, the view receives all touches in the multi-touch sequence.</p>
+</blockquote>
+</li>
+</ol>
+<p>情况2：普通的 UIControl 元素， 所有元素都有 touch 事件，有 action 回调，而且有 gesture, touch 事件需要 bubble 的情况下</p>
+<ol>
+<li>UIApplication 接收到时间，通过 hittest 找到第一响应者之后</li>
+<li>cancelsTouchesInView=NO 时，先执行 action 回调（allTouchEvent，touchDown 等）、touchesBegan，接着是执行 tap 手势响应（重点），再执行 action 回调（touchUpInside之类）、touchesEnded</li>
+<li>cancelsTouchesInView=YES 时，先执行 touchesBegan，接下来执行最后一个 gesture 手势，再执行 touchesCancelled</li>
+<li>touch 事件不会传播到父元素， gesture 更不会传播到父元素</li>
+</ol>
+<h3 id="结论："><a href="#结论：" class="headerlink" title="结论："></a>结论：</h3><ol>
+<li>一个元素只能有一个 某某类型的 gesture，后来者覆盖前者；但是可以有多个不同类型的 gesture。</li>
+<li>相同的 UIControl 的 target-event 可以有多个，不弄是否有相同 event state 类型。</li>
+<li>相同阶段的事件，执行顺序按照添加的顺序。</li>
+<li>UIControl 内部的事件不会传播到父元素，gesture 也一样。</li>
+<li>gesture 确确实实是独立于 touch event sequence 的事件，但是会干扰 event, Gesture 会先接管 touch event 的流程，然传递给 target-action 处理。</li>
+<li>Tap 事件和 view 是一一绑定的关系，多个 view 绑定相同 tap，最后一个有效。</li>
+<li>UIControl 的 target-event 只是对 touch event sequence 的采样后触发的逻辑，不会干扰手势也不会干扰 event 本身。注意 touch 的采样不会采样父元素的 touch event sequence。</li>
+<li>在 UIResponder 的事件链路里 touchesBegan 等调用父类的作用不仅仅是向父类传播事件，也在于完成本次 event sequence 事件，到结束或取消。</li>
+<li><code>cancelTrackingWithEvent</code> 是由 <code>touchesCancelled:withEvent:</code> 调用的。</li>
+<li><code>When adding an action method to a control, you specify both the action method and an object that defines that method to the addTarget:action:forControlEvents: method. If you specify nil for the target object, the control searches the responder chain for an object that defines the specified action method.</code> 他的含义在于如果 level_2 元素上的某个类型的 action 对应的 target = nil，则回去找 level_1 的 类型，查询 respondsToSelector 是否为 YES。<br>而不是理解为：level_2 不响应 event，然后让 level_1 来处理，这样理解是错误的。当然大部分情况下 target = nil ，还不如将这控件设置为 disabled（不考虑样式上的区别）。</li>
+</ol>
+<h3 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h3><p>通过简单的调用栈比较发现 当 <code>[UIWindow sendEvent:]</code> 之后</p>
+<ol>
+<li>Touch 事件由，[UIWindow _sendTouchesForEvent] 分发</li>
+<li>TapGesture 事件由，[UIGestureEvnvironment _updateForEvent:window:] 里的 <code>_wasDeliveredToGestureRecognizers</code> 分发<br>可见两者是两套系统。下面是来自苹果的文档里的一段，描述二者的关系。</li>
+</ol>
+<blockquote>
+<p>A window delivers touch events to a gesture recognizer before it delivers them to the hit-tested view attached to the gesture recognizer. Generally, if a gesture recognizer analyzes the stream of touches in a multi-touch sequence and doesn’t recognize its gesture, the view receives the full complement of touches. If a gesture recognizer recognizes its gesture, the remaining touches for the view are cancelled.<br><a href="https://developer.apple.com/documentation/uikit/uigesturerecognizer" target="_blank" rel="noopener">见文</a></p>
+</blockquote>
+<h3 id="实际应用距举例"><a href="#实际应用距举例" class="headerlink" title="实际应用距举例"></a>实际应用距举例</h3><h4 id="1-模仿-AOP-拦截"><a href="#1-模仿-AOP-拦截" class="headerlink" title="1.模仿 AOP 拦截"></a>1.模仿 AOP 拦截</h4><p>在所有可用响应的事件的元素，执行自身逻辑之前拦截，做功能逻辑的鉴权。<br>典型的场景：<br><strong>界面有“导出图片”，“转为 gif”，“上传到服务”三个按钮，这三个功能都需要用户购买 vip 服务。</strong></p>
+<ol>
+<li>传统的思路是在这三个方法的事件里，都添加前置判断逻辑，来判断是否是 vip ，不是则弹出购买 vip 的逻辑。这样的代码需要和真实的逻辑混在一起，即使是一个 <code>if isVip()  return</code>这样的逻辑也是职责不清。</li>
+<li>使用 TapGesture 独占的特性，我们在所有的按钮上都添加 cancelsTouchesInView = YES 的手势事件，单独处理 vip 判断逻辑。这样就做到了职责分离，即使后期，vip 服务和具体功能没有关联，也不需要改动“导出图片”等按钮的真实逻辑<h4 id="2-想象中的需求-App-内点击劫持"><a href="#2-想象中的需求-App-内点击劫持" class="headerlink" title="2.[想象中的需求] App 内点击劫持"></a>2.[想象中的需求] App 内点击劫持</h4>如果在 wechat 之类的第三方 App 上想做些事情，可以考虑使用 TapGesture 独占的特性来实现点击劫持。<h4 id="3-无干扰的事件监听"><a href="#3-无干扰的事件监听" class="headerlink" title="3.无干扰的事件监听"></a>3.无干扰的事件监听</h4>我们知道 target-action 可以添加多个，因为它观察者的身份不会对旧的逻辑产生影响（当然同时我们也知道一个事实：对于 tapGesture 事件无能为力）<br>所以我们可以为所有 button 都添加一个自己的 action，用来监听用户对这个 button 的点击情况</li>
+<li>当 button 没有添加业务事件时，代码逻辑里应该将这个 button disable（否则用户会丢失点击事件），这样我们的监听也不会触发</li>
+<li>当 button 有业务事件时，点击后业务逻辑和监听逻辑都会执行<br>well done。目前这种方式，被我使用在 apm SDK，<code>SauronEye</code> 里。用来代替传统的去 hook button 的 <code>addTarget</code> 方法的方式，更优雅</li>
+</ol>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ol>
+<li><a href="https://segmentfault.com/a/1190000013265845" target="_blank" rel="noopener">iOS事件处理，看我就够了~</a> ,本文没有考虑 cancelsTouchesInView 的影响</li>
+<li><a href="https://cloud.tencent.com/developer/article/1117024" target="_blank" rel="noopener">iOS 触摸事件响应链</a></li>
+<li><a href="https://developer.apple.com/documentation/uikit/uigesturerecognizer" target="_blank" rel="noopener">Documentation of UIGestureRecognizer</a></li>
+<li><a href="https://developer.apple.com/documentation/uikit/uicontrol" target="_blank" rel="noopener">Documentation UIKit Views and Controls UIControl</a></li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/04/15/欢迎使用熊掌记/" data-id="cjuib6fny00030kog6mk28lyh" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2019/04/15/runtime/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          runtime
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2019/04/15/hello-world/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Hello World</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Diary/">Diary</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Diary/Life/">Life</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Diary/Life/sd/">sd</a></li></ul></li></ul></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Game/">Game</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Ps/">Ps</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Game/" style="font-size: 10px;">Game</a> <a href="/tags/Ps/" style="font-size: 10px;">Ps</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">April 2019</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2019/04/15/runtime/">runtime</a>
+          </li>
+        
+          <li>
+            <a href="/2019/04/15/欢迎使用熊掌记/">(no title)</a>
+          </li>
+        
+          <li>
+            <a href="/2019/04/15/hello-world/">Hello World</a>
+          </li>
+        
+          <li>
+            <a href="/2019/04/15/mytest/">第一个</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2019 John Doe<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+
+
+  </div>
+</body>
+</html>
